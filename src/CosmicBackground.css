@@ -1,0 +1,65 @@
+/* src/CosmicBackground.css */
+
+.cosmic-background {
+  position: fixed; /* Fixes it to the viewport */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh; /* Full viewport height */
+  z-index: -1; /* Crucial: Places it behind all other content */
+  
+  /* Layer 1: The deep space base color */
+  background-color: #0A0A10;
+  
+  overflow: hidden; /* Ensures pseudo-elements don't cause scrollbars */
+}
+
+/* Layer 2: The moving nebula clouds, created with a pseudo-element */
+.cosmic-background::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+
+  /* We stack multiple radial gradients to create cloud-like shapes */
+  background-image: 
+    /* Purple Nebula */
+    radial-gradient(ellipse at 20% 30%, rgba(110, 50, 200, 0.4) 0%, transparent 70%),
+    /* Cyan Nebula */
+    radial-gradient(ellipse at 80% 60%, rgba(50, 150, 200, 0.4) 0%, transparent 70%);
+
+  /* We animate the position of these gradients to make them drift */
+  animation: driftNebulas 120s linear infinite;
+}
+
+/* Layer 3: The subtle cosmic dust/noise texture, created with another pseudo-element */
+.cosmic-background::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+
+  /* This is a URL-encoded SVG that generates a noise texture. It's tiny and efficient. */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 1000 1000' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  
+  /* The opacity is very low to make it a subtle effect */
+  opacity: 0.025;
+}
+
+
+/* The animation keyframes that slowly move the background gradients */
+@keyframes driftNebulas {
+  0% {
+    background-position: 0% 50%, 100% 50%;
+  }
+  50% {
+    background-position: 20% 60%, 80% 40%;
+  }
+  100% {
+    background-position: 0% 50%, 100% 50%;
+  }
+}
