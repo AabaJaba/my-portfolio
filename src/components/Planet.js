@@ -53,6 +53,7 @@ export function createPlanet(projectData) {
     const mesh = new THREE.Mesh(geometry, material);
     mesh.userData.id = projectData.id;
     mesh.userData.type = 'planet';
+    mesh.layers.set(1);
     
     return mesh;
 }

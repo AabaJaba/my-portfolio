@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import gsap from 'gsap';
 import vertexShader from '../shaders/tether/vertex.glsl';
 import fragmentShader from '../shaders/tether/fragment.glsl';
 
@@ -12,58 +13,85 @@ export class Tether {
     constructor(sun, planet) {
         this.sun = sun;
         this.planet = planet;
-        this.numPoints = 100;
+        this.numPoints = 200; // More points for a smoother helix
 
-        // 1. Define the curve
-        // We add a control point to make the tether bow outwards slightly.
-        this.controlPoint = new THREE.Vector3();
-        this.curve = new THREE.CatmullRomCurve3([
-            this.sun.position,
-            this.controlPoint,
-            this.planet.position
-        ], false, 'catmullrom', 0.5);
+        // A direct line for the particles to wrap around
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(this.numPoints * 3);
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-        // 2. Create the geometry with particle data
-        const points = this.curve.getPoints(this.numPoints);
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-
-        // Add a custom 'progress' attribute to each vertex for the shader
-        const progress = new Float32Array(this.numPoints + 1);
-        for(let i = 0; i < progress.length; i++) {
-            progress[i] = i / this.numPoints;
+        const progress = new Float32Array(this.numPoints);
+        for(let i = 0; i < this.numPoints; i++) {
+            progress[i] = i / (this.numPoints - 1);
         }
         geometry.setAttribute('aProgress', new THREE.BufferAttribute(progress, 1));
 
-        // 3. Create the shader material
+        // Create the shader material with our new uniforms
         const material = new THREE.ShaderMaterial({
             vertexShader,
             fragmentShader,
             uniforms: {
                 uTime: { value: 0 },
-                uColor: { value: TETHER_COLORS[this.sun.userData.id] }
+                uColor: { value: TETHER_COLORS[this.sun.userData.id] },
+                uBrightness: { value: 0.15 }, // Default: faint
+                uHelixRadius: { value: 0.2 }, // Default: thin
+                uHelixSpeed: { value: 0.5 },  // Default: slow
+                uPulseTime: { value: -1.0 }   // Default: no pulse
             },
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false
         });
 
-        // 4. Create the final Points object
         this.mesh = new THREE.Points(geometry, material);
     }
 
-    // This will be called on every frame to update the tether's shape
-    update(elapsedTime) {
-        // Update the curve points
-        this.controlPoint.lerpVectors(this.sun.position, this.planet.position, 0.5).add(new THREE.Vector3(0, 0, 10));
-        this.curve.points[0].copy(this.sun.position);
-        this.curve.points[1].copy(this.controlPoint);
-        this.curve.points[2].copy(this.planet.position);
-        
-        const points = this.curve.getPoints(this.numPoints);
-        this.mesh.geometry.setFromPoints(points);
-        this.mesh.geometry.attributes.position.needsUpdate = true;
+    // --- State Change Methods ---
+    onHoverStart() {
+        gsap.to(this.mesh.material.uniforms.uBrightness, { value: 0.5, duration: 0.3 });
+        gsap.to(this.mesh.material.uniforms.uHelixSpeed, { value: 1.0, duration: 0.3 });
+        // Animate the pulse from sun to planet
+        gsap.fromTo(this.mesh.material.uniforms.uPulseTime, 
+            { value: 0.0 }, 
+            { value: 1.0, duration: 1.0, ease: 'power2.inOut' }
+        );
+    }
 
-        // Update the shader time
+    onHoverEnd() {
+        gsap.to(this.mesh.material.uniforms.uBrightness, { value: 0.15, duration: 0.3 });
+        gsap.to(this.mesh.material.uniforms.uHelixSpeed, { value: 0.5, duration: 0.3 });
+    }
+    
+    onDragStart() {
+        gsap.to(this.mesh.material.uniforms.uBrightness, { value: 1.0, duration: 0.5 });
+        gsap.to(this.mesh.material.uniforms.uHelixRadius, { value: 0.8, duration: 0.5 });
+        gsap.to(this.mesh.material.uniforms.uHelixSpeed, { value: 2.0, duration: 0.5 });
+    }
+
+    onDragEnd(isHovering) {
+        // If the mouse is still over the planet, transition to hover state, else default state.
+        if (isHovering) {
+            this.onHoverStart();
+        } else {
+            this.onHoverEnd();
+        }
+        gsap.to(this.mesh.material.uniforms.uHelixRadius, { value: 0.2, duration: 0.5 });
+    }
+
+    update(elapsedTime) {
+        // Update the positions array for the line
+        const positions = this.mesh.geometry.attributes.position.array;
+        const sunPos = this.sun.position;
+        const planetPos = this.planet.position;
+        
+        for (let i = 0; i < this.numPoints; i++) {
+            const t = i / (this.numPoints - 1); // 0 to 1
+            const p = new THREE.Vector3().lerpVectors(sunPos, planetPos, t);
+            positions[i * 3] = p.x;
+            positions[i * 3 + 1] = p.y;
+            positions[i * 3 + 2] = p.z;
+        }
+        this.mesh.geometry.attributes.position.needsUpdate = true;
         this.mesh.material.uniforms.uTime.value = elapsedTime;
     }
 }

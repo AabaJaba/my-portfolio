@@ -1,4 +1,4 @@
-// src/main.js (Corrected with Lights)
+// src/main.js
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import gsap from 'gsap';
@@ -27,22 +27,26 @@ class World {
             1000
         );
         this.camera.position.set(0, 0, 100);
+        this.camera.layers.enableAll();
 
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true; 
-        this.controls.maxDistance = 100;
-        this.controls.minDistance = 5;
-        this.controls.enableRotate = false; // Disables left-click-drag rotation
-        this.controls.enablePan = true;    // Disables right-click-drag panning
+        this.controls.enableRotate = false;
+        this.controls.enablePan = false;
 
         this.clock = new THREE.Clock();
 
         this.raycaster = new THREE.Raycaster();
+        this.raycaster.layers.set(1);
         this.mouse = new THREE.Vector2();
         this.dragPlane = new THREE.Plane();
-        this.selectedNode = null; // This will hold the D3 node we are dragging
-        this.intersection = new THREE.Vector3(); // A reusable vecto
+        this.intersection = new THREE.Vector3();
         
+        this.selectedNode = null;
+        this.hoveredPlanet = null;
+        this.isPanning = false;
+        this.panStartPoint = new THREE.Vector3();
+
         this.init();
         this.addEventListeners();
         this.animate();
@@ -51,16 +55,12 @@ class World {
     async init() {
         console.log('World Initialized');
         
-        // --- FIX: ADD LIGHTS BACK INTO THE SCENE ---
-        // An ambient light illuminates all objects in the scene equally.
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Use a soft intensity
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         this.scene.add(ambientLight);
 
-        // A directional light acts like a distant sun, creating highlights and shadows.
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(5, 10, 7); // Pointing from the top-right
+        directionalLight.position.set(5, 10, 7);
         this.scene.add(directionalLight);
-        // --- END OF FIX ---
 
         await this.universe.build();
         setTimeout(() => this.frameScene(), 100); 
@@ -70,35 +70,21 @@ class World {
         const constellation = this.universe.threeObjects;
         if (constellation.children.length === 0) return;
 
-        // 1. Calculate the bounding box of the entire constellation
         const boundingBox = new THREE.Box3().setFromObject(constellation);
-        
         const center = new THREE.Vector3();
         boundingBox.getCenter(center);
-        
         const size = new THREE.Vector3();
         boundingBox.getSize(size);
 
-        // 2. Calculate the ideal camera distance
-        // Use the largest dimension (width or height) to determine the distance
         const maxDim = Math.max(size.x, size.y, size.z);
         const fov = this.camera.fov * (Math.PI / 180);
         let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-        
-        // Add some padding so the elements aren't right at the edge
         cameraZ *= 1.2; 
         
-        // 3. Set the camera's initial position and zoom limits
         this.camera.position.set(center.x, center.y, cameraZ);
-        
-        // Look at the center of the scene
         this.controls.target.copy(center);
-
-        // 4. Set zoom limits to prevent zooming out too far or in too close
-        this.controls.maxDistance = cameraZ * 1.5;   // Can't zoom out more than 50%
-        this.controls.minDistance = cameraZ / 5;      // Can't zoom in past a certain point
-
-        // Update the controls to apply the new target
+        this.controls.maxDistance = cameraZ * 1.5;
+        this.controls.minDistance = cameraZ / 5;
         this.controls.update();
     }
     
@@ -115,74 +101,103 @@ class World {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-     onPointerDown(event) {
-        // Update mouse coordinates (normalized from -1 to 1)
+    onPointerDown(event) {
+        // --- FIX: Update mouse position BEFORE using it for panning raycast ---
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 
-        this.raycaster.setFromCamera(this.mouse, this.camera);
-        
-        // Find all objects the ray intersects with
-        const intersects = this.raycaster.intersectObjects(this.universe.threeObjects.children);
+        if (this.hoveredPlanet) {
+            this.isPanning = false;
+            const planetMesh = this.hoveredPlanet;
+            this.selectedNode = this.universe.simulation.nodes().find(node => node.id === planetMesh.userData.id);
 
-        if (intersects.length > 0) {
-            const firstIntersect = intersects[0].object;
+            if (this.selectedNode) {
+                this.universe.tethers
+                    .filter(t => t.planet.userData.id === this.selectedNode.id)
+                    .forEach(t => t.onDragStart());
 
-            // Check if we clicked on a planet
-            if (firstIntersect.userData.type === 'planet') {
-                // Find the corresponding node in the physics simulation
-                this.selectedNode = this.universe.simulation.nodes().find(node => node.id === firstIntersect.userData.id);
-
-                if (this.selectedNode) {
-                    // "Pin" the node by setting its fixed position properties (fx, fy, fz)
-                    this.selectedNode.fx = this.selectedNode.x;
-                    this.selectedNode.fy = this.selectedNode.y;
-                    this.selectedNode.fz = this.selectedNode.z;
-                    
-                    // Define a plane to drag along. It's positioned at the planet's depth
-                    // and oriented towards the camera.
-                    this.camera.getWorldDirection(this.dragPlane.normal);
-                    this.dragPlane.setFromNormalAndCoplanarPoint(this.dragPlane.normal, firstIntersect.position);
-                }
+                this.selectedNode.fx = this.selectedNode.x;
+                this.selectedNode.fy = this.selectedNode.y;
+                this.selectedNode.fz = 0;
+                
+                this.camera.getWorldDirection(this.dragPlane.normal);
+                this.dragPlane.setFromNormalAndCoplanarPoint(this.dragPlane.normal, planetMesh.position);
             }
+        } else {
+            this.isPanning = true;
+            document.body.style.cursor = 'grabbing';
+            this.camera.getWorldDirection(this.dragPlane.normal);
+            this.dragPlane.setFromNormalAndCoplanarPoint(this.dragPlane.normal, this.controls.target);
+
+            this.raycaster.setFromCamera(this.mouse, this.camera);
+            this.raycaster.ray.intersectPlane(this.dragPlane, this.panStartPoint);
         }
     }
 
     onPointerMove(event) {
-        // Only run this if we are currently dragging a planet
+        this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        this.mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
         if (this.selectedNode) {
-            this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            this.mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
-
             this.raycaster.setFromCamera(this.mouse, this.camera);
-
-            // Find where the mouse ray intersects with our invisible drag plane
             if (this.raycaster.ray.intersectPlane(this.dragPlane, this.intersection)) {
-                // Update the pinned position of the D3 node to the intersection point.
                 this.selectedNode.fx = this.intersection.x;
                 this.selectedNode.fy = this.intersection.y;
-                // Since the scene is flattened, we keep fz at 0
-                this.selectedNode.fz = 0; 
-                
-                // "Reheat" the simulation to make the tethers react live
+                this.selectedNode.fz = 0;
                 this.universe.simulation.alphaTarget(0.3).restart();
+            }
+        } else if (this.isPanning) {
+            this.raycaster.setFromCamera(this.mouse, this.camera);
+            if (this.raycaster.ray.intersectPlane(this.dragPlane, this.intersection)) {
+                const delta = this.panStartPoint.clone().sub(this.intersection);
+                this.camera.position.add(delta);
+                this.controls.target.add(delta);
+            }
+        } else {
+            this.raycaster.setFromCamera(this.mouse, this.camera);
+            const intersects = this.raycaster.intersectObjects(this.universe.threeObjects.children);
+            const firstIntersect = intersects.length > 0 ? intersects[0].object : null;
+
+            if (this.hoveredPlanet && (!firstIntersect || this.hoveredPlanet.userData.id !== firstIntersect.userData.id)) {
+                document.body.style.cursor = 'default';
+                this.universe.tethers
+                    .filter(t => t.planet.userData.id === this.hoveredPlanet.userData.id)
+                    .forEach(t => t.onHoverEnd());
+                this.hoveredPlanet = null;
+            }
+
+            if (firstIntersect && !this.hoveredPlanet) {
+                document.body.style.cursor = 'grab';
+                this.hoveredPlanet = firstIntersect;
+                this.universe.tethers
+                    .filter(t => t.planet.userData.id === this.hoveredPlanet.userData.id)
+                    .forEach(t => t.onHoverStart());
             }
         }
     }
 
     onPointerUp() {
         if (this.selectedNode) {
-            // "Unpin" the node by clearing its fixed position. The simulation takes over again.
+            const isStillHovering = this.hoveredPlanet && this.hoveredPlanet.userData.id === this.selectedNode.id;
+            this.universe.tethers
+                .filter(t => t.planet.userData.id === this.selectedNode.id)
+                .forEach(t => t.onDragEnd(isStillHovering));
+            
             this.selectedNode.fx = null;
             this.selectedNode.fy = null;
-            // fz is already null, but good practice to clear it
-            this.selectedNode.fz = null; 
-            
-            // Let the simulation cool down
+            this.selectedNode.fz = null;
             this.universe.simulation.alphaTarget(0);
-
-            // Reset our state
             this.selectedNode = null;
+            
+            // --- FIX: Reset cursor correctly after dragging ---
+            if (!isStillHovering) {
+                document.body.style.cursor = 'default';
+            }
+        }
+        
+        if (this.isPanning) {
+            this.isPanning = false;
+            document.body.style.cursor = this.hoveredPlanet ? 'grab' : 'default';
         }
     }
     
@@ -192,8 +207,12 @@ class World {
         const elapsedTime = this.clock.getElapsedTime();
         this.universe.update(elapsedTime);
         
-        this.controls.update(); 
+        if (!this.selectedNode && !this.isPanning) {
+            this.controls.update(); 
+        }
+        
         this.renderer.render(this.scene, this.camera);
+    // --- FIX: Added the missing closing brace ---
     }
 }
 
