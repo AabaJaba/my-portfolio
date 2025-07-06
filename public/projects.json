@@ -1,0 +1,45 @@
+{
+  "projects": [
+    {
+      "id": "proj-01",
+      "title": "AI-Powered Data Visualization",
+      "slug": "ai-data-viz",
+      "categories": ["Development", "Design"],
+      "thumbnailUrl": "/thumbnails/proj-01.jpg",
+      "size": 1.8,  
+      "description": "An interactive platform for analyzing market trends using a custom neural network.",
+      "tools": ["Python", "TensorFlow", "React", "D3.js"],
+      "media": [
+        {"type": "image", "url": "/images/proj-01-a.png"},
+        {"type": "video", "url": "https://vimeo.com/12345678"}
+      ]
+    },
+    {
+      "id": "proj-02",
+      "title": "Kinetic Typography Commercial",
+      "slug": "kinetic-commercial",
+      "categories": ["Video Editing"],
+      "thumbnailUrl": "/thumbnails/proj-02.jpg",
+      "size": 1.2,  
+      "description": "A 30-second spot for a tech brand, focusing on dynamic motion graphics.",
+      "tools": ["Adobe After Effects", "Premiere Pro"],
+      "media": [
+        {"type": "video", "url": "https://vimeo.com/87654321"}
+      ]
+    },
+    {
+      "id": "proj-03",
+      "title": "Complete Brand Identity",
+      "slug": "startup-branding",
+      "categories": ["Design"],
+      "thumbnailUrl": "/thumbnails/proj-03.jpg",
+      "size": 1.5,  
+      "description": "Full branding package for a new startup, from logo to style guide.",
+      "tools": ["Figma", "Adobe Illustrator"],
+      "media": [
+        {"type": "image", "url": "/images/proj-03-a.png"},
+        {"type": "image", "url": "/images/proj-03-b.png"}
+      ]
+    }
+  ]
+}
