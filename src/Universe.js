@@ -124,7 +124,8 @@ export class Universe {
         // No need to call simulation.tick() manually, it runs automatically.
          this.threeObjects.children.forEach(obj => {
         if(obj.userData.type === 'sun') {
-            obj.material.uniforms.uTime.value = this.elapsedTime;
+             obj.userData.shellMaterial.uniforms.uTime.value = this.elapsedTime;
+             obj.userData.coreMaterial.uniforms.uTime.value = this.elapsedTime;
         }
     });
         this.simulation.nodes().forEach(node => {
