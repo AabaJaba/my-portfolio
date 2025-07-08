@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import gsap from 'gsap';
 import { Universe } from './Universe.js';
+import { Starfield } from './components/Starfield.js';  
 
 class World {
     constructor() {
@@ -12,12 +13,12 @@ class World {
         
         this.renderer = new THREE.WebGLRenderer({
             antialias: true,
-            alpha: true 
+            alpha: false 
         });
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.outputEncoding = THREE.sRGBEncoding;
-        this.renderer.setClearColor('#0A0A10'); 
+        this.renderer.setClearColor('#0A0A10');
         this.container.appendChild(this.renderer.domElement);
 
         this.camera = new THREE.PerspectiveCamera(
@@ -58,12 +59,30 @@ class World {
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         this.scene.add(ambientLight);
 
+        this.starfield = new Starfield();
+        this.scene.add(this.starfield.mesh);
+
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
         directionalLight.position.set(5, 10, 7);
         this.scene.add(directionalLight);
 
         await this.universe.build();
-        setTimeout(() => this.frameScene(), 100); 
+        this.waitForSimulationAndFrame(); 
+    }
+
+    waitForSimulationAndFrame() {
+        // This function will check the simulation's "energy" (alpha)
+        const checkAlpha = () => {
+            // Wait until the simulation has cooled down significantly (e.g., alpha < 0.1)
+            if (this.universe.simulation.alpha() < 0.1) {
+                this.frameScene();
+            } else {
+                // If not cool yet, check again on the next animation frame
+                requestAnimationFrame(checkAlpha);
+            }
+        };
+        // Start checking
+        requestAnimationFrame(checkAlpha);
     }
 
     frameScene() {
@@ -76,7 +95,7 @@ class World {
         const size = new THREE.Vector3();
         boundingBox.getSize(size);
 
-        const maxDim = Math.max(size.x, size.y, size.z);
+        const maxDim = Math.max(size.x, size.y, 50);
         const fov = this.camera.fov * (Math.PI / 180);
         let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
         cameraZ *= 1.2; 
@@ -206,6 +225,8 @@ class World {
         
         const elapsedTime = this.clock.getElapsedTime();
         this.universe.update(elapsedTime);
+        
+        this.starfield.update(elapsedTime);
         
         if (!this.selectedNode && !this.isPanning) {
             this.controls.update(); 
