@@ -99,8 +99,24 @@ class World {
         const fov = this.camera.fov * (Math.PI / 180);
         let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
         cameraZ *= 1.2; 
+
+        gsap.to(this.camera.position, {
+            x: center.x,
+            y: center.y,
+            z: cameraZ,
+            duration: 1.5,
+            ease: 'power3.inOut'
+        });
+
+        gsap.to(this.controls.target, {
+            x: center.x,
+            y: center.y,
+            z: center.z,
+            duration: 1.5,
+            ease: 'power3.inOut'
+        });
         
-        this.camera.position.set(center.x, center.y, cameraZ);
+        //this.camera.position.set(center.x, center.y, cameraZ);
         this.controls.target.copy(center);
         this.controls.maxDistance = cameraZ * 1.5;
         this.controls.minDistance = cameraZ / 5;
