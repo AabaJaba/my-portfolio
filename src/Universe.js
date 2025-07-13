@@ -100,9 +100,9 @@ export class Universe {
             .force('z_plane', forceZ(0).strength(1.0));
 
         const sunPositions = {
-            'Design': new THREE.Vector3(-20, 10, 0),
-            'Development': new THREE.Vector3(20, 10, 0),
-            'Video Editing': new THREE.Vector3(0, -20, 0)
+            'Design': new THREE.Vector3(0, 20, 0),
+            'Development': new THREE.Vector3(15, -15, 0),
+            'Video Editing': new THREE.Vector3(-15, -15, 0)
         };
 
         this.simulation.nodes().forEach(node => {

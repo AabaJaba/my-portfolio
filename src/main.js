@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import gsap from 'gsap';
 import { Universe } from './Universe.js';
-import { Starfield } from './components/Starfield.js';  
+import { Galaxy } from './components/Galaxy.js';  
 
 class World {
     constructor() {
@@ -59,8 +59,8 @@ class World {
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         this.scene.add(ambientLight);
 
-        this.starfield = new Starfield();
-        this.scene.add(this.starfield.mesh);
+        this.galaxy = new Galaxy(this.scene);
+        this.scene.add(this.galaxy.mesh);
 
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
         directionalLight.position.set(5, 10, 7);
@@ -240,9 +240,10 @@ class World {
         requestAnimationFrame(this.animate.bind(this));
         
         const elapsedTime = this.clock.getElapsedTime();
+        const deltaTime = this.clock.getDelta();
         this.universe.update(elapsedTime);
         
-        this.starfield.update(elapsedTime);
+        this.galaxy.update(elapsedTime,deltaTime);
         
         if (!this.selectedNode && !this.isPanning) {
             this.controls.update(); 

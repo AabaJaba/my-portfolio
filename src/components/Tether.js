@@ -65,7 +65,7 @@ export class Tether {
     onDragStart() {
         gsap.to(this.mesh.material.uniforms.uBrightness, { value: 1.0, duration: 0.5 });
         gsap.to(this.mesh.material.uniforms.uHelixRadius, { value: 0.8, duration: 0.5 });
-        gsap.to(this.mesh.material.uniforms.uHelixSpeed, { value: 2.0, duration: 0.5 });
+        gsap.to(this.mesh.material.uniforms.uHelixSpeed, { value: 1.2, duration: 0.5 });
     }
 
     onDragEnd(isHovering) {
