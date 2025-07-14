@@ -169,7 +169,7 @@ export class Galaxy {
         const position = new THREE.Vector3(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
         const direction = new THREE.Vector3().sub(position).normalize();
         const starGeometry = new THREE.SphereGeometry(0.1, 16, 16);
-        const starMaterial = new THREE.MeshBasicMaterial({ color: "#ffffffee" });
+        const starMaterial = new THREE.MeshBasicMaterial({ color: "#ffffee" });
         const starMesh = new THREE.Mesh(starGeometry, starMaterial);
         starMesh.position.copy(position);
         const shootingStar = new THREE.Group();

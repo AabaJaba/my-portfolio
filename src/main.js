@@ -5,6 +5,7 @@ import { Universe } from './Universe.js';
 import { Galaxy } from './components/Galaxy.js';  
 
 class World {
+    // ... constructor, init, and other methods are unchanged ...
     constructor() {
         this.scene = new THREE.Scene();
         this.container = document.querySelector('#app');
@@ -69,19 +70,14 @@ class World {
         this.waitForSimulationAndFrame(); 
     }
 
-    // ... (waitForSimulationAndFrame, frameScene methods are unchanged) ...
     waitForSimulationAndFrame() {
-        // This function will check the simulation's "energy" (alpha)
         const checkAlpha = () => {
-            // Wait until the simulation has cooled down significantly (e.g., alpha < 0.1)
             if (this.universe.simulation && this.universe.simulation.alpha() < 0.1) {
                 this.frameScene();
             } else {
-                // If not cool yet, check again on the next animation frame
                 requestAnimationFrame(checkAlpha);
             }
         };
-        // Start checking
         requestAnimationFrame(checkAlpha);
     }
 
@@ -116,7 +112,6 @@ class World {
             ease: 'power3.inOut'
         });
         
-        //this.camera.position.set(center.x, center.y, cameraZ);
         this.controls.target.copy(center);
         this.controls.maxDistance = cameraZ * 1.5;
         this.controls.minDistance = cameraZ / 5;
@@ -140,7 +135,14 @@ class World {
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 
-        if (this.hoveredPlanet) {
+        // The ray needs to be updated here too, to check what we're clicking on.
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        this.raycaster.layers.set(1);
+        const intersects = this.raycaster.intersectObjects(this.universe.threeObjects.children);
+        
+        if (intersects.length > 0) {
+            // Clicked on a planet
+            this.hoveredPlanet = intersects[0].object; // Ensure hoveredPlanet is set
             this.isPanning = false;
             const planetMesh = this.hoveredPlanet;
             this.selectedNode = this.universe.simulation.nodes().find(node => node.id === planetMesh.userData.id);
@@ -158,11 +160,13 @@ class World {
                 this.dragPlane.setFromNormalAndCoplanarPoint(this.dragPlane.normal, planetMesh.position);
             }
         } else {
+            // Clicked on empty space
             this.isPanning = true;
             document.body.style.cursor = 'grabbing';
             this.camera.getWorldDirection(this.dragPlane.normal);
             this.dragPlane.setFromNormalAndCoplanarPoint(this.dragPlane.normal, this.controls.target);
 
+            // We need to re-update the raycaster here for the panning plane intersection
             this.raycaster.setFromCamera(this.mouse, this.camera);
             this.raycaster.ray.intersectPlane(this.dragPlane, this.panStartPoint);
         }
@@ -171,73 +175,77 @@ class World {
     onPointerMove(event) {
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+        
+        // --- FIX #1: ALWAYS update the raycaster at the beginning of the move event. ---
+        this.raycaster.setFromCamera(this.mouse, this.camera);
 
-        if (this.selectedNode || this.isPanning) {
-            // ... Logic for dragging and panning is unchanged ...
-            if(this.selectedNode) {
-                 this.raycaster.ray.intersectPlane(this.dragPlane, this.intersection)
+        if (this.selectedNode) {
+            // --- DRAGGING A PLANET ---
+            // This now works because the raycaster is always up-to-date.
+            if (this.raycaster.ray.intersectPlane(this.dragPlane, this.intersection)) {
                 this.selectedNode.fx = this.intersection.x;
                 this.selectedNode.fy = this.intersection.y;
-                this.selectedNode.fz = 0;
+                this.selectedNode.fz = 0; // Keep it on the Z=0 plane
                 this.universe.simulation.alphaTarget(0.3).restart();
-            } else { // isPanning
-                 if (this.raycaster.ray.intersectPlane(this.dragPlane, this.intersection)) {
-                    const delta = this.panStartPoint.clone().sub(this.intersection);
-                    this.camera.position.add(delta);
-                    this.controls.target.add(delta);
-                }
+            }
+        } else if (this.isPanning) {
+            // --- PANNING THE SCENE ---
+            if (this.raycaster.ray.intersectPlane(this.dragPlane, this.intersection)) {
+                const delta = this.panStartPoint.clone().sub(this.intersection);
+                this.camera.position.add(delta);
+                this.controls.target.add(delta);
             }
         } else {
-            // === HOVERING LOGIC ===
-            this.raycaster.setFromCamera(this.mouse, this.camera);
+            // --- HOVERING LOGIC (when not dragging or panning) ---
+            
+            // Task 1: Check for hovering over a planet (Layer 1)
+            this.raycaster.layers.set(1);
+            const planetIntersects = this.raycaster.intersectObjects(this.universe.threeObjects.children);
+            const intersectedPlanet = planetIntersects.length > 0 ? planetIntersects[0].object : null;
 
-            // --- PLANET HOVER LOGIC ---
-            this.raycaster.layers.set(1); // Check only for planets
-            const intersects = this.raycaster.intersectObjects(this.universe.threeObjects.children);
-            const firstIntersect = intersects.length > 0 ? intersects[0].object : null;
-
-            if (this.hoveredPlanet && (!firstIntersect || this.hoveredPlanet.userData.id !== firstIntersect.userData.id)) {
-                // Leaving a planet
-                document.body.style.cursor = 'default';
+            if (this.hoveredPlanet && this.hoveredPlanet !== intersectedPlanet) {
+                // Mouse is LEAVING a planet
                 this.universe.tethers
                     .filter(t => t.planet.userData.id === this.hoveredPlanet.userData.id)
                     .forEach(t => t.onHoverEnd());
                 this.hoveredPlanet = null;
             }
 
-            if (firstIntersect && !this.hoveredPlanet) {
-                // Entering a new planet
-                document.body.style.cursor = 'grab';
-                this.hoveredPlanet = firstIntersect;
+            if (intersectedPlanet && intersectedPlanet !== this.hoveredPlanet) {
+                // Mouse is ENTERING a new planet
+                this.hoveredPlanet = intersectedPlanet;
                 this.universe.tethers
                     .filter(t => t.planet.userData.id === this.hoveredPlanet.userData.id)
                     .forEach(t => t.onHoverStart());
             }
 
-            // --- BLACK HOLE HOVER LOGIC ---
-            // FIX #3: Temporarily check all layers to see the black hole (on layer 0)
-            this.raycaster.layers.enableAll();
-            
+            // Task 2: Check for hovering over the black hole (Layer 0)
+            this.raycaster.layers.set(0); // Explicitly check only layer 0
             if (this.galaxy && this.galaxy.blackHoleMesh) {
                 const blackHoleIntersects = this.raycaster.intersectObject(this.galaxy.blackHoleMesh);
-
+                
                 if (blackHoleIntersects.length > 0 && !this.isHoveringBlackHole) {
+                    // ENTERING black hole
                     this.isHoveringBlackHole = true;
-                    if (!this.hoveredPlanet) document.body.style.cursor = 'pointer';
                     gsap.to(this.galaxy.galaxyMaterial.uniforms.uWaveStrength, {
-                        value: 1.0,
-                        duration: 1.5,
-                        ease: 'power2.out'
+                        value: 1.0, duration: 1.5, ease: 'power2.out'
                     });
                 } else if (blackHoleIntersects.length === 0 && this.isHoveringBlackHole) {
+                    // LEAVING black hole
                     this.isHoveringBlackHole = false;
-                    if (!this.hoveredPlanet) document.body.style.cursor = 'default';
                     gsap.to(this.galaxy.galaxyMaterial.uniforms.uWaveStrength, {
-                        value: 0.0,
-                        duration: 1.5,
-                        ease: 'power2.out'
+                        value: 0.0, duration: 1.5, ease: 'power2.out'
                     });
                 }
+            }
+            
+            // Task 3: Set the cursor based on what's being hovered
+            if (this.hoveredPlanet) {
+                document.body.style.cursor = 'grab';
+            } else if (this.isHoveringBlackHole) {
+                document.body.style.cursor = 'pointer';
+            } else {
+                document.body.style.cursor = 'default';
             }
         }
     }
@@ -253,7 +261,7 @@ class World {
             this.selectedNode.fy = null;
             this.selectedNode.fz = null;
             this.universe.simulation.alphaTarget(0);
-this.selectedNode = null;
+            this.selectedNode = null;
             
             if (!isStillHovering) {
                 document.body.style.cursor = 'default';
@@ -273,7 +281,7 @@ this.selectedNode = null;
         const deltaTime = this.clock.getDelta();
         
         if (this.universe) this.universe.update(elapsedTime);
-        if (this.galaxy) this.galaxy.update(elapsedTime,deltaTime);
+        if (this.galaxy) this.galaxy.update(elapsedTime, deltaTime);
         
         if (!this.selectedNode && !this.isPanning) {
             this.controls.update(); 
