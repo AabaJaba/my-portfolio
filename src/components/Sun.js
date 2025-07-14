@@ -1,15 +1,14 @@
 // src/components/Sun.js
 import * as THREE from 'three';
-// Imports for the outer shell (atmosphere)
 import shellVertexShader from '../shaders/sun/vertex.glsl';
 import shellFragmentShader from '../shaders/sun/fragment.glsl';
-
-// Imports for the inner core
 import coreVertexShader from '../shaders/sunCore/vertex.glsl';
 import coreFragmentShader from '../shaders/sunCore/fragment.glsl';
+import gsap from 'gsap';
+import { CustomEase } from 'gsap/CustomEase'; // 1. Import the plugin
+gsap.registerPlugin(CustomEase);
 
 const textureLoader = new THREE.TextureLoader();
-// Ensure the /public/textures/noise.png file exists
 const noiseTexture = textureLoader.load('/textures/noise.png');
 noiseTexture.wrapS = noiseTexture.wrapT = THREE.RepeatWrapping;
 
@@ -18,7 +17,6 @@ const SUN_CONFIG = {
     'Development': { core: new THREE.Color('#0074D9'), corona: new THREE.Color('#7FDBFF') },
     'Video Editing': { core: new THREE.Color('#2ECC40'), corona: new THREE.Color('#AFFF9E') }
 };
-
 
 export function createSun(skillName) {
     const config = SUN_CONFIG[skillName];
@@ -33,14 +31,13 @@ export function createSun(skillName) {
             uColor1: { value: config.core },
             uColor2: { value: new THREE.Color(config.core).multiplyScalar(0.5) },
             uTime: { value: 0 },
+            uAnimationSpeed: { value: 1.0 }
         },
     });
     const coreMesh = new THREE.Mesh(coreGeometry, coreMaterial);
     
     // --- 2. The Outer Shell (Atmosphere) ---
-    const shellGeometry = new THREE.IcosahedronGeometry(3.5, 30); // Using your previous size of 3.5
-
-    // --- FIX: Use the correct shader variables for the shell ---
+    const shellGeometry = new THREE.IcosahedronGeometry(3.5, 30);
     const shellMaterial = new THREE.ShaderMaterial({
         vertexShader: shellVertexShader,
         fragmentShader: shellFragmentShader,
@@ -49,7 +46,8 @@ export function createSun(skillName) {
             uNoiseAmount: { value: 0.15 },
             uCoreColor: { value: config.core },
             uCoronaColor: { value: config.corona },
-            uNoiseTexture: { value: noiseTexture }
+            uNoiseTexture: { value: noiseTexture },
+            uAnimationSpeed: { value: 1.0 }
         },
         transparent: true,
         blending: THREE.AdditiveBlending,
@@ -65,6 +63,13 @@ export function createSun(skillName) {
     sunGroup.userData.type = 'sun';
     sunGroup.userData.coreMaterial = coreMaterial;
     sunGroup.userData.shellMaterial = shellMaterial;
+
+    // --- THE FINAL, CORRECT FIX ---
+    // The .traverse() method visits the sunGroup itself AND all of its children
+    // (coreMesh and shellMesh), ensuring everything is on the correct layer.
+    sunGroup.traverse((object) => {
+        object.layers.set(1);
+    });
     
     return sunGroup;
 }

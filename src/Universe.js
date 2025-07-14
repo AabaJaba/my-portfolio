@@ -5,6 +5,7 @@ import { forceSimulation, forceLink, forceManyBody, forceCenter, forceZ } from '
 import { createPlanet } from './components/Planet.js';
 import { createSun } from './components/Sun.js'; 
 import { Tether } from './components/Tether.js';
+import gsap from 'gsap';
 
 export class Universe {
     constructor(scene) {
@@ -31,6 +32,30 @@ export class Universe {
             return { projects: [] };
         }
         return await response.json();
+    }
+
+            // In src/Universe.js
+    onSunHoverStart(sunMesh) {
+        console.log("HOVER START on Sun:", sunMesh.userData.id); 
+        const shellMaterial = sunMesh.userData.shellMaterial;
+        const coreMaterial = sunMesh.userData.coreMaterial;
+
+        // Increase bumpiness of the atmosphere
+        gsap.to(shellMaterial.uniforms.uNoiseAmount, { value: 0.35, duration: 0.2, ease: 'power3.in' });
+        // Speed up both animations
+        gsap.to(shellMaterial.uniforms.uAnimationSpeed, { value: 1.0, duration: 0.4, ease: 'expo.in' });
+        gsap.to(coreMaterial.uniforms.uAnimationSpeed, { value: 1.0, duration: 0.4, ease: 'expo.in' });
+    }
+
+    onSunHoverEnd(sunMesh) {
+        console.log("HOVER END on Sun:", sunMesh.userData.id);
+        const shellMaterial = sunMesh.userData.shellMaterial;
+        const coreMaterial = sunMesh.userData.coreMaterial;
+
+        // Return to normal
+        gsap.to(shellMaterial.uniforms.uNoiseAmount, { value: 0.15, duration: 0.6, ease: 'power3.out' });
+        gsap.to(shellMaterial.uniforms.uAnimationSpeed, { value: 1.0, duration: 1.0, ease: 'expo.in' });
+        gsap.to(coreMaterial.uniforms.uAnimationSpeed, { value: 1.0, duration: 1.0, ease: 'expo.in' });
     }
 
     createGraph(projects) {

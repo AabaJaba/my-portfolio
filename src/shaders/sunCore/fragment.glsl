@@ -2,6 +2,8 @@ uniform vec3 uColor1;
 uniform vec3 uColor2;
 uniform float uTime;
 
+uniform float uAnimationSpeed;
+
 varying vec2 vUv;
 
 // Classic Perlin 2D Noise function
@@ -41,10 +43,14 @@ float cnoise(vec2 P) {
 }
 
 void main() {
+
+    float animatedTime = uTime * uAnimationSpeed;
+    
     // We'll layer two noise patterns at different scales and speeds
     // to create a more complex, churning effect.
-    float noise1 = cnoise(vUv * 4.0 + uTime * 0.1);
-    float noise2 = cnoise(vUv * 8.0 - uTime * 0.15);
+    // THIS IS THE CORRECTED PART: Using `animatedTime`
+    float noise1 = cnoise(vUv * 4.0 + animatedTime * 0.1);
+    float noise2 = cnoise(vUv * 8.0 - animatedTime * 0.15);
     
     // Combine the noises. The 'pow' function increases contrast.
     float combinedNoise = pow(noise1 + noise2, 2.0);
