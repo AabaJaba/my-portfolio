@@ -1,4 +1,3 @@
-// src/main.js
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import gsap from 'gsap';
@@ -38,7 +37,6 @@ class World {
         this.clock = new THREE.Clock();
 
         this.raycaster = new THREE.Raycaster();
-        this.raycaster.layers.set(1);
         this.mouse = new THREE.Vector2();
         this.dragPlane = new THREE.Plane();
         this.intersection = new THREE.Vector3();
@@ -47,6 +45,7 @@ class World {
         this.hoveredPlanet = null;
         this.isPanning = false;
         this.panStartPoint = new THREE.Vector3();
+        this.isHoveringBlackHole = false;
 
         this.init();
         this.addEventListeners();
@@ -70,11 +69,12 @@ class World {
         this.waitForSimulationAndFrame(); 
     }
 
+    // ... (waitForSimulationAndFrame, frameScene methods are unchanged) ...
     waitForSimulationAndFrame() {
         // This function will check the simulation's "energy" (alpha)
         const checkAlpha = () => {
             // Wait until the simulation has cooled down significantly (e.g., alpha < 0.1)
-            if (this.universe.simulation.alpha() < 0.1) {
+            if (this.universe.simulation && this.universe.simulation.alpha() < 0.1) {
                 this.frameScene();
             } else {
                 // If not cool yet, check again on the next animation frame
@@ -137,7 +137,6 @@ class World {
     }
 
     onPointerDown(event) {
-        // --- FIX: Update mouse position BEFORE using it for panning raycast ---
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 
@@ -173,27 +172,32 @@ class World {
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 
-        if (this.selectedNode) {
-            this.raycaster.setFromCamera(this.mouse, this.camera);
-            if (this.raycaster.ray.intersectPlane(this.dragPlane, this.intersection)) {
+        if (this.selectedNode || this.isPanning) {
+            // ... Logic for dragging and panning is unchanged ...
+            if(this.selectedNode) {
+                 this.raycaster.ray.intersectPlane(this.dragPlane, this.intersection)
                 this.selectedNode.fx = this.intersection.x;
                 this.selectedNode.fy = this.intersection.y;
                 this.selectedNode.fz = 0;
                 this.universe.simulation.alphaTarget(0.3).restart();
-            }
-        } else if (this.isPanning) {
-            this.raycaster.setFromCamera(this.mouse, this.camera);
-            if (this.raycaster.ray.intersectPlane(this.dragPlane, this.intersection)) {
-                const delta = this.panStartPoint.clone().sub(this.intersection);
-                this.camera.position.add(delta);
-                this.controls.target.add(delta);
+            } else { // isPanning
+                 if (this.raycaster.ray.intersectPlane(this.dragPlane, this.intersection)) {
+                    const delta = this.panStartPoint.clone().sub(this.intersection);
+                    this.camera.position.add(delta);
+                    this.controls.target.add(delta);
+                }
             }
         } else {
+            // === HOVERING LOGIC ===
             this.raycaster.setFromCamera(this.mouse, this.camera);
+
+            // --- PLANET HOVER LOGIC ---
+            this.raycaster.layers.set(1); // Check only for planets
             const intersects = this.raycaster.intersectObjects(this.universe.threeObjects.children);
             const firstIntersect = intersects.length > 0 ? intersects[0].object : null;
 
             if (this.hoveredPlanet && (!firstIntersect || this.hoveredPlanet.userData.id !== firstIntersect.userData.id)) {
+                // Leaving a planet
                 document.body.style.cursor = 'default';
                 this.universe.tethers
                     .filter(t => t.planet.userData.id === this.hoveredPlanet.userData.id)
@@ -202,11 +206,38 @@ class World {
             }
 
             if (firstIntersect && !this.hoveredPlanet) {
+                // Entering a new planet
                 document.body.style.cursor = 'grab';
                 this.hoveredPlanet = firstIntersect;
                 this.universe.tethers
                     .filter(t => t.planet.userData.id === this.hoveredPlanet.userData.id)
                     .forEach(t => t.onHoverStart());
+            }
+
+            // --- BLACK HOLE HOVER LOGIC ---
+            // FIX #3: Temporarily check all layers to see the black hole (on layer 0)
+            this.raycaster.layers.enableAll();
+            
+            if (this.galaxy && this.galaxy.blackHoleMesh) {
+                const blackHoleIntersects = this.raycaster.intersectObject(this.galaxy.blackHoleMesh);
+
+                if (blackHoleIntersects.length > 0 && !this.isHoveringBlackHole) {
+                    this.isHoveringBlackHole = true;
+                    if (!this.hoveredPlanet) document.body.style.cursor = 'pointer';
+                    gsap.to(this.galaxy.galaxyMaterial.uniforms.uWaveStrength, {
+                        value: 1.0,
+                        duration: 1.5,
+                        ease: 'power2.out'
+                    });
+                } else if (blackHoleIntersects.length === 0 && this.isHoveringBlackHole) {
+                    this.isHoveringBlackHole = false;
+                    if (!this.hoveredPlanet) document.body.style.cursor = 'default';
+                    gsap.to(this.galaxy.galaxyMaterial.uniforms.uWaveStrength, {
+                        value: 0.0,
+                        duration: 1.5,
+                        ease: 'power2.out'
+                    });
+                }
             }
         }
     }
@@ -222,9 +253,8 @@ class World {
             this.selectedNode.fy = null;
             this.selectedNode.fz = null;
             this.universe.simulation.alphaTarget(0);
-            this.selectedNode = null;
+this.selectedNode = null;
             
-            // --- FIX: Reset cursor correctly after dragging ---
             if (!isStillHovering) {
                 document.body.style.cursor = 'default';
             }
@@ -241,16 +271,15 @@ class World {
         
         const elapsedTime = this.clock.getElapsedTime();
         const deltaTime = this.clock.getDelta();
-        this.universe.update(elapsedTime);
         
-        this.galaxy.update(elapsedTime,deltaTime);
+        if (this.universe) this.universe.update(elapsedTime);
+        if (this.galaxy) this.galaxy.update(elapsedTime,deltaTime);
         
         if (!this.selectedNode && !this.isPanning) {
             this.controls.update(); 
         }
         
         this.renderer.render(this.scene, this.camera);
-    // --- FIX: Added the missing closing brace ---
     }
 }
 

@@ -32,7 +32,6 @@ export class Galaxy {
         this.mesh = new THREE.Group();
         this.mesh.rotation.x = -Math.PI / 2;
 
-        // --- UPDATED: Using your final parameters ---
         this.parameters = {
             count: 100000,
             size: 0.015,
@@ -52,17 +51,22 @@ export class Galaxy {
         this.shootingStars = [];
         this.lastShotTime = 0;
         this.starfieldMaterials = [];
+        this.blackHoleMesh = null;
 
-        // --- ADD THE BLACK HOLE ---
-        // A simple, non-reflective black sphere at the center of the group.
-        const blackHoleGeometry = new THREE.SphereGeometry(2, 32, 32);
-        const blackHoleMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-        const blackHoleMesh = new THREE.Mesh(blackHoleGeometry, blackHoleMaterial);
-        this.mesh.add(blackHoleMesh);
-        // --- END OF ADDITION ---
-
+        // FIX #1: Call the correctly named function.
+        // FIX #2: Removed the duplicate inline black hole creation from here.
+        this._generateBlackHole();
         this._generateGalaxy();
         this._generateStarfield(); 
+    }
+
+    _generateBlackHole() {
+        const blackHoleGeometry = new THREE.SphereGeometry(2, 32, 32);
+        const blackHoleMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+        this.blackHoleMesh = new THREE.Mesh(blackHoleGeometry, blackHoleMaterial);
+        
+        // No layer setting needed here; we will manage it in the raycaster.
+        this.mesh.add(this.blackHoleMesh);
     }
 
     _generateGalaxy() {
@@ -73,6 +77,7 @@ export class Galaxy {
         }
 
         this.galaxyGeometry = new THREE.BufferGeometry();
+        // ... (Buffer creation logic is unchanged) ...
         const positions = new Float32Array(this.parameters.count * 3);
         const colors = new Float32Array(this.parameters.count * 3);
         const colorInside = new THREE.Color(this.parameters.insideColor);
@@ -104,7 +109,8 @@ export class Galaxy {
                 uMaxSize: { value: 15.0 },
                 uFadeInDistance: { value: 2.0 },
                 uTime: { value: 0 },
-                uRadius: { value: this.parameters.radius }
+                uRadius: { value: this.parameters.radius },
+                uWaveStrength: { value: 0.0 }
             },
             vertexShader: galaxyVertexShader,
             fragmentShader: galaxyFragmentShader,
@@ -117,6 +123,7 @@ export class Galaxy {
         this.mesh.add(this.galaxyPoints);
     }
     
+    // ... (Rest of the file is unchanged) ...
     _generateStarfield() {
         const layers = [
             { count: 2000, size: 0.3, color: new THREE.Color('#FFFFFF'), distance: 200 },
