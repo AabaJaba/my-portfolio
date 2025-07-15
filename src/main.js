@@ -2,9 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import gsap from 'gsap';
 import { Galaxy } from './components/Galaxy.js'; 
-import { CustomEase } from 'gsap/CustomEase'; // 1. Import the plugin
-gsap.registerPlugin(CustomEase);
-CustomEase.create("flare", ".47,0,.5,1"); 
+import './style.css';
 import { Universe } from './Universe.js';
 
 class World {
@@ -13,22 +11,14 @@ class World {
         this.container = document.querySelector('#app');
         this.universe = new Universe(this.scene);
         
-        this.renderer = new THREE.WebGLRenderer({
-            antialias: true,
-            alpha: false 
-        });
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.outputEncoding = THREE.sRGBEncoding;
         this.renderer.setClearColor('#0A0A10');
         this.container.appendChild(this.renderer.domElement);
 
-        this.camera = new THREE.PerspectiveCamera(
-            55,
-            window.innerWidth / window.innerHeight,
-            0.1,
-            1000
-        );
+        this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
         this.camera.position.set(0, 0, 100);
         this.camera.layers.enableAll();
 
@@ -38,7 +28,6 @@ class World {
         this.controls.enablePan = false;
 
         this.clock = new THREE.Clock();
-
         this.raycaster = new THREE.Raycaster();
         this.mouse = new THREE.Vector2();
         this.dragPlane = new THREE.Plane();
@@ -92,21 +81,24 @@ class World {
         const fov = this.camera.fov * (Math.PI / 180);
         let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
         cameraZ *= 1.2; 
-        gsap.to(this.camera.position, {
-            x: center.x, y: center.y, z: cameraZ, duration: 1.5, ease: 'power3.inOut'
-        });
-        gsap.to(this.controls.target, {
-            x: center.x, y: center.y, z: center.z, duration: 1.5, ease: 'power3.inOut'
-        });
+        gsap.to(this.camera.position, { x: center.x, y: center.y, z: cameraZ, duration: 1.5, ease: 'power3.inOut' });
+        gsap.to(this.controls.target, { x: center.x, y: center.y, z: center.z, duration: 1.5, ease: 'power3.inOut' });
         this.controls.target.copy(center);
         this.controls.maxDistance = cameraZ * 1.5;
         this.controls.minDistance = cameraZ / 5;
         this.controls.update();
+        this.overviewCameraState = {
+            position: this.camera.position.clone(),
+            target: this.controls.target.clone()
+        };
     }
     
     addEventListeners() {
         window.addEventListener('resize', this.onResize.bind(this));
+        // --- THE FIX ---
+        // Corrected the typo from `adopendEventListener` to `addEventListener`
         window.addEventListener('pointerdown', this.onPointerDown.bind(this));
+        // --- END OF FIX ---
         window.addEventListener('pointermove', this.onPointerMove.bind(this));
         window.addEventListener('pointerup', this.onPointerUp.bind(this));
     }
@@ -120,12 +112,29 @@ class World {
     onPointerDown(event) {
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+        this.raycaster.setFromCamera(this.mouse, this.camera);
         
-        if (this.hoveredPlanet) {
-            this.isPanning = false;
-            const planetMesh = this.hoveredPlanet;
-            this.selectedNode = this.universe.simulation.nodes().find(node => node.id === planetMesh.userData.id);
+        this.raycaster.layers.set(0);
+        if (this.galaxy.blackHoleMesh) {
+            const blackHoleIntersects = this.raycaster.intersectObject(this.galaxy.blackHoleMesh);
+            if (blackHoleIntersects.length > 0) {
+                window.location.href = '/about.html';
+                return;
+            }
+        }
 
+        this.raycaster.layers.set(1);
+        const intersects = this.raycaster.intersectObjects(this.universe.threeObjects.children, true);
+        const planetIntersect = intersects.find(i => {
+            let parent = i.object;
+            while(parent.parent && !parent.userData.type) { parent = parent.parent; }
+            return parent.userData.type === 'planet';
+        });
+
+        if (planetIntersect) {
+            const planetMesh = planetIntersect.object.userData.type === 'planet' ? planetIntersect.object : planetIntersect.object.parent;
+            this.isPanning = false;
+            this.selectedNode = this.universe.simulation.nodes().find(node => node.id === planetMesh.userData.id);
             if (this.selectedNode) {
                 this.universe.tethers.filter(t => t.planet.userData.id === this.selectedNode.id).forEach(t => t.onDragStart());
                 this.selectedNode.fx = this.selectedNode.x;
@@ -139,7 +148,6 @@ class World {
             document.body.style.cursor = 'grabbing';
             this.camera.getWorldDirection(this.dragPlane.normal);
             this.dragPlane.setFromNormalAndCoplanarPoint(this.dragPlane.normal, this.controls.target);
-            this.raycaster.setFromCamera(this.mouse, this.camera);
             this.raycaster.ray.intersectPlane(this.dragPlane, this.panStartPoint);
         }
     }
@@ -147,9 +155,7 @@ class World {
     onPointerMove(event) {
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
-        
         this.raycaster.setFromCamera(this.mouse, this.camera);
-
         if (this.selectedNode) {
             if (this.raycaster.ray.intersectPlane(this.dragPlane, this.intersection)) {
                 this.selectedNode.fx = this.intersection.x;
@@ -164,7 +170,6 @@ class World {
                 this.controls.target.add(delta);
             }
         } else {
-            // --- HOVERING LOGIC ---
             this.raycaster.layers.set(1);
             const intersects = this.raycaster.intersectObjects(this.universe.threeObjects.children, true);
             let intersectedObject = null;
@@ -173,27 +178,23 @@ class World {
                 while (parent.parent && !parent.userData.type) { parent = parent.parent; }
                 intersectedObject = parent;
             }
-
             const newHoveredPlanet = (intersectedObject && intersectedObject.userData.type === 'planet') ? intersectedObject : null;
             const newHoveredSun = (intersectedObject && intersectedObject.userData.type === 'sun') ? intersectedObject : null;
-
             if (this.hoveredPlanet !== newHoveredPlanet) {
                 if (this.hoveredPlanet) this.universe.tethers.filter(t => t.planet.userData.id === this.hoveredPlanet.userData.id).forEach(t => t.onHoverEnd());
                 if (newHoveredPlanet) this.universe.tethers.filter(t => t.planet.userData.id === newHoveredPlanet.userData.id).forEach(t => t.onHoverStart());
                 this.hoveredPlanet = newHoveredPlanet;
             }
-
             if (this.hoveredSun !== newHoveredSun) {
                 if (this.hoveredSun) this.universe.onSunHoverEnd(this.hoveredSun);
                 if (newHoveredSun) this.universe.onSunHoverStart(newHoveredSun);
                 this.hoveredSun = newHoveredSun;
             }
-
             this.raycaster.layers.set(0);
             if (this.galaxy && this.galaxy.blackHoleMesh) {
                 const blackHoleIntersects = this.raycaster.intersectObject(this.galaxy.blackHoleMesh);
                 const isCurrentlyOver = blackHoleIntersects.length > 0;
-                if (isCurrentlyOver && !this.isHoveringBlackHole) {
+                if (isCurrentlyOver && !this.isHoveringBlackHle) {
                     this.isHoveringBlackHole = true;
                     gsap.to(this.galaxy.galaxyMaterial.uniforms.uWaveStrength, { value: 1.0, duration: 1.5, ease: 'power2.out' });
                 } else if (!isCurrentlyOver && this.isHoveringBlackHole) {
@@ -201,7 +202,6 @@ class World {
                     gsap.to(this.galaxy.galaxyMaterial.uniforms.uWaveStrength, { value: 0.0, duration: 1.5, ease: 'power2.out' });
                 }
             }
-            
             if (this.hoveredPlanet) document.body.style.cursor = 'grab';
             else if (this.hoveredSun || this.isHoveringBlackHole) document.body.style.cursor = 'pointer';
             else document.body.style.cursor = 'default';
@@ -222,8 +222,6 @@ class World {
         
         if (this.isPanning) {
             this.isPanning = false;
-            // THE FINAL FIX: Explicitly clear hoveredPlanet state after a pan.
-            this.hoveredPlanet = null; 
             document.body.style.cursor = 'default';
         }
     }
@@ -234,7 +232,9 @@ class World {
         const deltaTime = this.clock.getDelta();
         if (this.universe) this.universe.update(elapsedTime);
         if (this.galaxy) this.galaxy.update(elapsedTime, deltaTime);
-        if (!this.selectedNode && !this.isPanning) this.controls.update(); 
+        if (!this.selectedNode && !this.isPanning) {
+            this.controls.update(); 
+        }
         this.renderer.render(this.scene, this.camera);
     }
 }

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About - Constellation Portfolio</title>
+    <!-- We link to the same CSS file -->
+    <link rel="stylesheet" href="/src/style.css">
+    <!-- Link to your favicon -->
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+</head>
+<body class="about-page-body">
+
+    <!-- New: Faint background grid for the blueprint effect -->
+    <div class="background-grid"></div>
+
+    <div class="about-container">
+        <a href="/" class="close-button" aria-label="Back to Portfolio">×</a>
+
+        <header class="about-header">
+            <div class="profile-photo-container">
+                <img src="/profile.jpg" alt="Your Name" class="profile-photo"/>
+                <!-- New: Animated rings for a holographic feel -->
+                <div class="ring ring-1"></div>
+                <div class="ring ring-2"></div>
+            </div>
+            <div class="header-text">
+                <h1>Your Name</h1>
+                <h2>Creative Technologist & Digital Artist</h2>
+            </div>
+        </header>
+
+        <section class="about-bio">
+            <h3>Mission Statement</h3>
+            <p>I build immersive digital experiences that bridge the gap between art and technology. My passion lies in creating interactive narratives and procedural art, transforming complex data into beautiful, intuitive visuals.</p>
+        </section>
+
+        <!-- New: The full skills section -->
+        <section class="about-skills">
+            <h3>Core Competencies</h3>
+            <div class="skill-groups">
+                <div class="skill-group">
+                    <span class="skill-icon design"></span>
+                    <h4>Design</h4>
+                    <ul>
+                        <li>UI/UX Prototyping</li>
+                        <li>Brand Identity</li>
+                        <li>Motion Graphics</li>
+                    </ul>
+                </div>
+                <div class="skill-group">
+                    <span class="skill-icon development"></span>
+                    <h4>Development</h4>
+                    <ul>
+                        <li>Three.js & WebGL</li>
+                        <li>React & JavaScript</li>
+                        <li>D3.js & Data Viz</li>
+                    </ul>
+                </div>
+                <div class="skill-group">
+                    <span class="skill-icon video"></span>
+                    <h4>Video</h4>
+                    <ul>
+                        <li>Editing & Post-Production</li>
+                        <li>Color Grading</li>
+                        <li>VFX Compositing</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- New: The full footer section -->
+        <footer class="about-footer">
+            <a href="/resume.pdf" class="cta-button" download>Download Resume</a>
+            <div class="social-links">
+                <!-- Replace # with your links. You can use SVG icons here instead of text. -->
+                <a href="#" aria-label="GitHub">GH</a>
+                <a href="#" aria-label="LinkedIn">IN</a>
+                <a href="#" aria-label="Vimeo">VM</a>
+            </div>
+        </footer>
+    </div>
+
+</body>
+</html>
