@@ -1,0 +1,16 @@
+/* /src/styles/global.css */
+/* Import the font once, globally */
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600&display=swap');
+
+/* Basic resets */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #0A0A10;
+    font-family: 'Exo 2', system-ui, sans-serif;
+    color: #c7d2fe;
+}

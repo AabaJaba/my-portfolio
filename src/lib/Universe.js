@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 // --- FIX 1: Import the CORRECT function names revealed by our diagnostic log ---
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceZ } from 'd3-force-3d';
-import { createPlanet } from './components/Planet.js';
-import { createSun } from './components/Sun.js'; 
-import { Tether } from './components/Tether.js';
+import { createPlanet } from './Planet.js';
+import { createSun } from './Sun.js'; 
+import { Tether } from './Tether.js';
 import gsap from 'gsap';
 
 export class Universe {
